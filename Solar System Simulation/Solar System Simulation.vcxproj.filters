@@ -1,0 +1,134 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="graphics">
+      <UniqueIdentifier>{e1bfa85a-f024-4ad1-a470-335d99a4a9c7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="io">
+      <UniqueIdentifier>{bb78bc3c-a63e-46d6-9a9d-b8fc2cadff28}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders">
+      <UniqueIdentifier>{55fafcef-e7de-4fab-8907-902333596a9d}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="main.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Keyboard.cpp">
+      <Filter>io</Filter>
+    </ClCompile>
+    <ClCompile Include="Mouse.cpp">
+      <Filter>io</Filter>
+    </ClCompile>
+    <ClCompile Include="Jostick.cpp">
+      <Filter>io</Filter>
+    </ClCompile>
+    <ClCompile Include="Shader.cpp">
+      <Filter>graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="Camera.cpp">
+      <Filter>io</Filter>
+    </ClCompile>
+    <ClCompile Include="Texture.cpp">
+      <Filter>graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="Planet.cpp">
+      <Filter>Header Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Mesh.cpp">
+      <Filter>Header Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="object.vert">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="object.frag">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="sphere.vert">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="sphere.frag">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="planets.vert">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="planets.frag">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="stars.vert">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="stars.frag">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="glow.vert">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="glow.frag">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="bright.frag">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="blur.frag">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="final.frag">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="screen.vert">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="orbit.vert">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="orbit.frag">
+      <Filter>Shaders</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Keyboard.h">
+      <Filter>io</Filter>
+    </ClInclude>
+    <ClInclude Include="Mouse.h">
+      <Filter>io</Filter>
+    </ClInclude>
+    <ClInclude Include="Joystick.h">
+      <Filter>io</Filter>
+    </ClInclude>
+    <ClInclude Include="Shader.h">
+      <Filter>graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="glMemory.hpp">
+      <Filter>graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="Camera.h">
+      <Filter>io</Filter>
+    </ClInclude>
+    <ClInclude Include="Texture.h">
+      <Filter>graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="Planet.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Mesh.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>
