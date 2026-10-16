@@ -51,6 +51,12 @@
     <ClCompile Include="Mesh.cpp">
       <Filter>Header Files</Filter>
     </ClCompile>
+    <ClCompile Include="Physics.cpp">
+      <Filter>Header Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Bloom.cpp">
+      <Filter>Header Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="object.vert">
@@ -101,6 +107,9 @@
     <None Include="orbit.frag">
       <Filter>Shaders</Filter>
     </None>
+    <None Include="downsample.frag">
+      <Filter>Shaders</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Keyboard.h">
@@ -128,6 +137,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Mesh.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Physics.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Bloom.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

@@ -2,41 +2,58 @@
 
 Mesh* Planet::sharedSphere = nullptr;
 
-Planet::Planet(const std::string& name, float radius, float distanceFromPlanet, 
-	float orbitSpeedDegPerSec, float rotationSpeedDegPerSec, GLuint textureID, std::shared_ptr<Planet> parent)
-	: name(name), radius(radius), distanceFromPlanet(distanceFromPlanet), 
-	orbitSpeed(orbitSpeedDegPerSec), rotationSpeed(rotationSpeedDegPerSec), 
-	orbitAngleDeg(0.0f), rotationAngleDeg(0.0f), orbitAxis(0.0f, 1.0f, 0.0f), 
-	rotationAxis(0.0f, 1.0f, 0.0f), textureID(textureID), parent(parent)
-	
-	{
+Planet::Planet(const std::string& name, float radius, double mass, float orbitRadius,
+	float spinDegPerSec, float axialTiltDeg, GLuint textureID, std::shared_ptr<Planet> parent, float emission)
+	: name(name), radius(radius), mass(mass), emission(emission),
+	position(0.0), relPosition(0.0), relVelocity(0.0),
+	orientation(1.0, 0.0, 0.0, 0.0), angularMomentum(0.0),
+	momentOfInertia(physics::solidSphereInertia(mass, radius)),
+	textureID(textureID), parent(parent)
+{
 	if (!sharedSphere) {
 		sharedSphere = Mesh::CreateSphere(64, 64);
 	}
+
+	if (parent) {
+		const double mu = physics::G * (parent->mass + mass);
+		relPosition = glm::dvec3(orbitRadius, 0.0, 0.0);
+		relVelocity = glm::dvec3(0.0, 0.0, -physics::circularSpeed(mu, orbitRadius));
+		position = parent->position + relPosition;
+	}
+
+	orientation = glm::angleAxis(-glm::radians((double)axialTiltDeg), glm::dvec3(0.0, 0.0, 1.0));
+	const glm::dvec3 spinAxis = orientation * glm::dvec3(0.0, 1.0, 0.0);
+	angularMomentum = momentOfInertia * glm::radians((double)spinDegPerSec) * spinAxis;
 }
 
-void Planet::update(float deltaTime, float timeScale){
-	float scaledDt = deltaTime * timeScale;
-	orbitAngleDeg += orbitSpeed * scaledDt;
-	rotationAngleDeg += rotationSpeed * scaledDt;
+void Planet::update(double dt) {
+	
+	if (parent) {
+		const double mu = physics::G * (parent->mass + mass);
+		physics::stepTwoBody(relPosition, relVelocity, mu, dt);
+		position = parent->position + relPosition;
+	}
 
-	// keep angles in same ranges
-	if (orbitAngleDeg >= 360.0f) orbitAngleDeg -= 360.0f;
-	if (rotationAngleDeg >= 360.0f) rotationAngleDeg -= 360.0f;
+	const glm::dvec3 omega = angularMomentum / momentOfInertia;
+	physics::stepOrientation(orientation, omega, dt);
 
-	for (auto& c : children) c->update(deltaTime, timeScale);
+	for (auto& c : children) c->update(dt);
 }
 
-void Planet::draw(Shader& shader, const glm::mat4& parentModel){
-	glm::mat4 model = parentModel * computeLocalModel();
+void Planet::draw(Shader& shader) {
+	glm::mat4 model = glm::mat4_cast(glm::quat(orientation));
+	model[0] *= radius;
+	model[1] *= radius;
+	model[2] *= radius;
+	model[3] = glm::vec4(glm::vec3(position), 1.0f);
 
 	shader.activate();
 	shader.setMat4("model", model);
+	shader.setFloat("emission", emission);
 
 	shader.setInt("diffuse0", 0);
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, textureID);
-	
 
 	sharedSphere->draw();
 
@@ -44,33 +61,5 @@ void Planet::draw(Shader& shader, const glm::mat4& parentModel){
 
 	// draw children
 	for (auto& c : children)
-		c->draw(shader, model);
-}
-
-glm::vec3 Planet::positionWorld() const{
-	glm::mat4 w = computeWorldModel();
-	return glm::vec3(w * glm::vec4(0.0, 0.0, 0.0, 1.0));
-}
-
-glm::mat4 Planet::computeLocalModel() const{
-	glm::mat4 model(1.0f);
-
-	// orbit rotation around partents origin
-	model = glm::rotate(model, glm::radians(orbitAngleDeg), orbitAxis);
-
-	// translate out to orbital radius
-	model = glm::translate(model, glm::vec3(distanceFromPlanet, 0.0f, 0.0f));
-
-	// apply axial tilt and rotation
-	model = glm::rotate(model, glm::radians(rotationAngleDeg), rotationAxis);
-
-	// scale to planet radius
-	model = glm::scale(model, glm::vec3(radius));
-
-	return model;
-}
-
-glm::mat4 Planet::computeWorldModel() const{
-	if (parent) return parent->computeWorldModel() * computeLocalModel();
-	return computeLocalModel();
+		c->draw(shader);
 }

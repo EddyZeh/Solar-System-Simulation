@@ -20,9 +20,18 @@ uniform sampler2D diffuse0;
 uniform vec3 viewPos;
 uniform PointLight sunLight;
 uniform float shininess;
+uniform float emission;
 
 void main(){
     vec3 texColor = vec3(texture(diffuse0, TexCoords));
+
+    if( emission > 0.0){
+        vec3 viewDirE = normalize(viewPos - FragPos);
+        float mu = max(dot(normalize(Normal), viewDirE), 0.0);
+        float limb = 1.0 - 0.6 * (1.0 - mu);
+        FragColor = vec4(texColor * emission * limb, 1.0);
+        return;
+    }
 
     vec3 ambient = sunLight.ambient * texColor;
 

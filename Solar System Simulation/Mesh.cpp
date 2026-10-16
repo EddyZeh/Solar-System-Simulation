@@ -15,7 +15,7 @@ Mesh::Mesh(std::vector<float>& vertices, std::vector<unsigned int>& indices) {
 	VAO["VBO"].bind();
 	VAO["VBO"].setData<float>(static_cast<GLuint>(vertices.size()), &vertices[0], GL_STATIC_DRAW);
 
-	
+
 	VAO["EBO"] = BufferObject(GL_ELEMENT_ARRAY_BUFFER);
 	VAO["EBO"].generate();
 
@@ -37,7 +37,7 @@ void Mesh::draw() {
 	VAO.bind();
 	glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(indexCount), GL_UNSIGNED_INT, 0);
 	ArrayObject::clear();
-	
+
 }
 
 Mesh* Mesh::CreateSphere(unsigned int X_SEGMENTS, unsigned int Y_SEGMENTS) {
@@ -50,11 +50,12 @@ Mesh* Mesh::CreateSphere(unsigned int X_SEGMENTS, unsigned int Y_SEGMENTS) {
 			float xSegment = (float)x / (float)X_SEGMENTS;
 			float ySegment = (float)y / (float)Y_SEGMENTS;
 
+	
 			float xPos = std::cos(xSegment * glm::two_pi<float>()) *
-				std::sin(ySegment * glm::two_pi<float>());
-			float yPos = std::cos(ySegment * glm::two_pi<float>());
+				std::sin(ySegment * glm::pi<float>());
+			float yPos = std::cos(ySegment * glm::pi<float>());
 			float zPos = std::sin(xSegment * glm::two_pi<float>()) *
-				std::sin(ySegment * glm::two_pi<float>());
+				std::sin(ySegment * glm::pi<float>());
 
 			// Position (3) + Normal (3) + UV (2)
 			vertices.push_back(xPos);
@@ -65,7 +66,8 @@ Mesh* Mesh::CreateSphere(unsigned int X_SEGMENTS, unsigned int Y_SEGMENTS) {
 			vertices.push_back(yPos);
 			vertices.push_back(zPos);
 
-			vertices.push_back(xSegment);
+			// U runs opposite to the longitude angle above, otherwise maps appear mirrored east-west
+			vertices.push_back(1.0f - xSegment);
 			vertices.push_back(1.0f - ySegment);
 		}
 	}
@@ -76,13 +78,14 @@ Mesh* Mesh::CreateSphere(unsigned int X_SEGMENTS, unsigned int Y_SEGMENTS) {
 			unsigned int a = (y) * (X_SEGMENTS + 1) + x;
 			unsigned int b = (y + 1) * (X_SEGMENTS + 1) + x;
 
+			// counter-clockwise seen from outside, so GL_BACK culling keeps the outer surface
 			indices.push_back(a);
-			indices.push_back(b);
 			indices.push_back(a + 1);
+			indices.push_back(b);
 
 			indices.push_back(b);
-			indices.push_back(b + 1);
 			indices.push_back(a + 1);
+			indices.push_back(b + 1);
 		}
 	}
 	return new Mesh(vertices, indices);

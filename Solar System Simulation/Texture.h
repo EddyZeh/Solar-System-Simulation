@@ -15,7 +15,7 @@ public:
 	Texture(std::string dir, std::string path);
 
 	void generate();
-	void load(bool flip = true);
+	void load(bool flip = true, bool srgb = true);
 
 	unsigned int id;
 	aiTextureType type;

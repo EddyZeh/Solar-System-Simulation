@@ -1,6 +1,7 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
+#include <algorithm>
 #include <iostream>
 
 #include "Shader.h"
@@ -8,6 +9,7 @@
 #include "glMemory.hpp"
 
 //physics
+#include "Physics.h"
 
 // io
 #include "Camera.h"
@@ -17,10 +19,13 @@
 #include "Joystick.h"
 
 #include "Planet.h"
+#include "Bloom.h"
 
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void processInput(GLFWwindow* window, float dt);
+
+Bloom* g_bloom = nullptr;   // so the resize callback can rebuild the HDR/bloom targets
 
 
 unsigned int SCR_WIDTH = 800;
@@ -59,7 +64,12 @@ int main() {
 		return -1;
 	}
 
-	glViewport(0, 0, 800, 600);
+	// the framebuffer can differ from the window size (high-DPI screens), so ask GLFW
+	int fbWidth, fbHeight;
+	glfwGetFramebufferSize(window, &fbWidth, &fbHeight);
+	SCR_WIDTH = fbWidth;
+	SCR_HEIGHT = fbHeight;
+	glViewport(0, 0, fbWidth, fbHeight);
 
 	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
@@ -69,117 +79,35 @@ int main() {
 
 	glEnable(GL_DEPTH_TEST);
 
-	// HDR FRAMEBUFFER
-	GLuint hdrFBO;
-	glGenFramebuffers(1, &hdrFBO);
-	glBindFramebuffer(GL_FRAMEBUFFER, hdrFBO);
-
-	GLuint colorBuffer;
-	glGenTextures(1, &colorBuffer);
-	glBindTexture(GL_TEXTURE_2D, colorBuffer);
-	glTexImage2D(
-		GL_TEXTURE_2D,
-		0,
-		GL_RGBA16F,
-		SCR_WIDTH,
-		SCR_HEIGHT,
-		0,
-		GL_RGBA,
-		GL_FLOAT,
-		nullptr
-	);
-
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glFramebufferTexture2D(
-		GL_FRAMEBUFFER,
-		GL_COLOR_ATTACHMENT0,
-		GL_TEXTURE_2D,
-		colorBuffer,
-		0
-	);
-
-	// depth
-	GLuint rboDepth;
-	glGenRenderbuffers(1, &rboDepth);
-	glBindRenderbuffer(GL_RENDERBUFFER, rboDepth);
-	glRenderbufferStorage(
-		GL_RENDERBUFFER,
-		GL_DEPTH_COMPONENT,
-		SCR_WIDTH,
-		SCR_HEIGHT
-	);
-
-	glFramebufferRenderbuffer(
-		GL_FRAMEBUFFER,
-		GL_DEPTH_ATTACHMENT,
-		GL_RENDERBUFFER,
-		rboDepth
-	);
-
-	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-		std::cerr << "HDR framebuffer not complete" << std::endl;
-
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-	GLuint pingpongFBO[2];
-	GLuint pingpongTex[2];
-
-	glGenFramebuffers(2, pingpongFBO);
-	glGenTextures(2, pingpongTex);
-
-	for (int i = 0; i < 2; i++) {
-		glBindFramebuffer(GL_FRAMEBUFFER, pingpongFBO[i]);
-		glBindTexture(GL_TEXTURE_2D, pingpongTex[i]);
-
-		glTexImage2D(
-			GL_TEXTURE_2D, 0,
-			GL_RGBA16F,
-			SCR_WIDTH, SCR_HEIGHT,
-			0, GL_RGBA, GL_FLOAT, nullptr
-		);
-
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		// clamp to edge for blur
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
-		glFramebufferTexture2D(
-			GL_FRAMEBUFFER,
-			GL_COLOR_ATTACHMENT0,
-			GL_TEXTURE_2D,
-			pingpongTex[i],
-			0
-		);
-	}
+	// HDR FRAMEBUFFER + BLOOM (see Bloom.h; replaces the hand-written hdrFBO / pingpong code)
+	Bloom bloom;
+	bloom.init(fbWidth, fbHeight);
+	bloom.threshold = 1.0f;   // only things brighter than 1.0 in HDR (the Sun) glow
+	bloom.strength = 0.9f;
+	bloom.exposure = 1.0f;
+	g_bloom = &bloom;
 
 	// SHADERS ====================================================
-	Shader planetShader ("planets.vert", "planets.frag" );
-	Shader starsShader  ("stars.vert",   "stars.frag"   );
-	Shader glowShader   ("glow.vert",    "glow.frag"    );
-	Shader brightShader ("screen.vert",  "bright.frag"  );
-	Shader blurShader   ("screen.vert",  "blur.frag"    );
-	Shader finalShader  ("screen.vert",  "final.frag"   );
+	Shader planetShader("planets.vert", "planets.frag");
+	Shader starsShader("stars.vert", "stars.frag");
+	Shader glowShader("glow.vert", "glow.frag");
 
 	// Textures ==================================================
-	Texture sunTex     ("assets", "sun.jpg"             );
-	Texture mercuryTex ("assets", "mercury.jpg"         );
-	Texture venusTex   ("assets", "mercury.jpg"         );
-	Texture earthTex   ("assets", "earth.jpg"           );
-	Texture moonTex    ("assets", "moon.jpg"            );
-	Texture marsTex    ("assets", "mars.jpg"            );
-	Texture jupiterTex ("assets", "jupiter.jpg"         );
-	Texture saturnTex  ("assets", "saturn.jpg"          );
-	Texture uranusTex  ("assets", "uranus.jpg"          );
-	Texture neptuneTex ("assets", "neptune.jpg"         );
-	Texture starsTex   ("assets", "stars_milky_way.jpg" );
+	Texture sunTex("assets", "sun.jpg");
+	Texture mercuryTex("assets", "mercury.jpg");
+	Texture venusTex("assets", "venus.jpg");
+	Texture earthTex("assets", "earth.jpg");
+	Texture moonTex("assets", "moon.jpg");
+	Texture marsTex("assets", "mars.jpg");
+	Texture jupiterTex("assets", "jupiter.jpg");
+	Texture saturnTex("assets", "saturn.jpg");
+	Texture uranusTex("assets", "uranus.jpg");
+	Texture neptuneTex("assets", "neptune.jpg");
+	Texture starsTex("assets", "stars_milky_way.jpg");
 	sunTex.load();
 	mercuryTex.load();
-	earthTex.load(false);
+	venusTex.load();
+	earthTex.load();
 	moonTex.load();
 	marsTex.load();
 	jupiterTex.load();
@@ -191,46 +119,25 @@ int main() {
 	// MODELS  ====================================================
 	Mesh* sphere = Mesh::CreateSphere(64, 64);
 
-	GLuint quadVAO = 0, quadVBO = 0;
+	const double sunMass = 1500.0;
+	const double earthMass = 20.0;
+	const double moonMass = 0.25;
+	const float  moonDist = 2.0f;
 
-	float quadVertices[] = {
-		// pos        // tex
-		-1.f, -1.f,   0.f, 0.f,
-		 1.f, -1.f,   1.f, 0.f,
-		 1.f,  1.f,   1.f, 1.f,
-					  
-		-1.f, -1.f,   0.f, 0.f,
-		 1.f,  1.f,   1.f, 1.f,
-		-1.f,  1.f,   0.f, 1.f
-	};
+	const float moonSpin = (float)glm::degrees(
+		physics::circularAngularRate(physics::G * (earthMass + moonMass), moonDist));
 
-	glGenVertexArrays(1, &quadVAO);
-	glGenBuffers(1, &quadVBO);
-
-	glBindVertexArray(quadVAO);
-	glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), quadVertices, GL_STATIC_DRAW);
-
-	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
-	glEnableVertexAttribArray(0);
-
-	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float),
-		(void*)(2 * sizeof(float)));
-	glEnableVertexAttribArray(1);
-
-	glBindVertexArray(0);
-
-
-	auto sun = std::make_shared<Planet>("Sun", 2.5f, 0.0f, 0.0f, 5.0f, sunTex.id, nullptr);
-	auto mercury = std::make_shared<Planet>("Mercury", 0.095f, 5.33f, 23.5f, 3.0f, mercuryTex.id, sun);
-	auto venus = std::make_shared<Planet>("Venus", 0.235f, 7.33f, 17.5f, 2.0f, venusTex.id, sun);
-	auto earth = std::make_shared<Planet>("Earth", 0.25f, 10.0f, 15.0f, 25.0f, earthTex.id, sun);
-	auto moon = std::make_shared<Planet>("Moon", 0.07f, 1.0f, 40.0f, 5.0f, moonTex.id, earth);
-	auto mars = std::make_shared<Planet>("Mars", 0.135f, 13.33f, 12.0f, 22.5f, marsTex.id, sun);
-	auto jupiter = std::make_shared<Planet>("Jupiter", 0.75f, 20.0f, 6.5f, 50.0f, jupiterTex.id, sun);
-	auto saturn = std::make_shared<Planet>("Saturn", 0.6f, 26.67f, 4.5f, 45.0f, saturnTex.id, sun);
-	auto uranus = std::make_shared<Planet>("Uranus", 0.45f, 33.33f, 3.0f, 35.0f, uranusTex.id, sun);
-	auto neptune = std::make_shared<Planet>("Neptune", 0.425f, 40.0f, 2.5f, 32.5f, neptuneTex.id, sun);
+	//                                      name       radius  mass                    dist    spin  tilt    texture
+	auto sun = std::make_shared<Planet>("Sun", 2.5f, sunMass, 0.0f, 5.0f, 7.25f, sunTex.id, nullptr, 8.0f);
+	auto mercury = std::make_shared<Planet>("Mercury", 0.2375f, sunMass * 1.66e-7, 13.33f, 3.0f, 0.03f, mercuryTex.id, sun);
+	auto venus = std::make_shared<Planet>("Venus", 0.5875f, sunMass * 2.45e-6, 18.33f, 2.0f, 177.36f, venusTex.id, sun);
+	auto earth = std::make_shared<Planet>("Earth", 0.625f, earthMass, 25.0f, 25.0f, 23.44f, earthTex.id, sun);
+	auto moon = std::make_shared<Planet>("Moon", 0.17f, moonMass, moonDist, moonSpin, 1.54f, moonTex.id, earth);
+	auto mars = std::make_shared<Planet>("Mars", 0.3375f, sunMass * 3.23e-7, 33.33f, 22.5f, 25.19f, marsTex.id, sun);
+	auto jupiter = std::make_shared<Planet>("Jupiter", 1.875f, sunMass * 9.54e-4, 50.0f, 50.0f, 3.13f, jupiterTex.id, sun);
+	auto saturn = std::make_shared<Planet>("Saturn", 1.5f, sunMass * 2.86e-4, 66.67f, 45.0f, 26.73f, saturnTex.id, sun);
+	auto uranus = std::make_shared<Planet>("Uranus", 1.125f, sunMass * 4.37e-5, 83.33f, 35.0f, 97.77f, uranusTex.id, sun);
+	auto neptune = std::make_shared<Planet>("Neptune", 1.0625f, sunMass * 5.15e-5, 100.0f, 32.5f, 28.32f, neptuneTex.id, sun);
 
 	sun->addChild(mercury);
 	sun->addChild(venus);
@@ -248,6 +155,7 @@ int main() {
 	float deltaTime = 0.0f;
 	float lastFrame = 0.0f;
 	float timeScale = 1.0f;
+	double physicsAccumulator = 0.0;
 
 	// main window
 	while (!glfwWindowShouldClose(window)) {
@@ -257,11 +165,17 @@ int main() {
 		lastFrame = currentFrame;
 		processInput(window, deltaTime);
 
-		for (auto& r : roots) r->update(deltaTime, timeScale);
 
-		glBindFramebuffer(GL_FRAMEBUFFER, hdrFBO);
-		glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		physicsAccumulator += std::min(deltaTime, 0.25f) * timeScale;
+		int physicsSteps = 0;
+		while (physicsAccumulator >= physics::kFixedDt && physicsSteps < 64) {
+			for (auto& r : roots) r->update(physics::kFixedDt);
+			physicsAccumulator -= physics::kFixedDt;
+			physicsSteps++;
+		}
+		if (physicsSteps == 64) physicsAccumulator = 0.0;
+
+		bloom.bindScene();   // render into the floating-point HDR buffer
 
 		glDepthMask(GL_FALSE);
 		glDepthFunc(GL_LEQUAL);
@@ -299,7 +213,7 @@ int main() {
 		glDepthMask(GL_TRUE);
 		glBindTexture(GL_TEXTURE_2D, 0);
 
-		
+
 		glDepthMask(GL_TRUE);
 		glDepthFunc(GL_LESS);
 
@@ -311,76 +225,16 @@ int main() {
 
 		// sun as lightSource
 		planetShader.set3Float("sunLight.position", glm::vec3(0.0f, 0.0f, 0.0f));
-		planetShader.set3Float("sunLight.ambient", glm::vec3(0.2f));
-		planetShader.set3Float("sunLight.diffuse", glm::vec3(6.0f));
-		planetShader.set3Float("sunLight.specular", glm::vec3(3.0f));
+		planetShader.set3Float("sunLight.ambient", glm::vec3(0.03f));
+		planetShader.set3Float("sunLight.diffuse", glm::vec3(3.0f));
+		planetShader.set3Float("sunLight.specular", glm::vec3(0.3f));
 		planetShader.setFloat("shininess", 32.0f);
 
 
-		for (auto& r : roots) r->draw(planetShader, glm::mat4(1.0f));
+		for (auto& r : roots) r->draw(planetShader);
 
 
-			glDisable(GL_DEPTH_TEST);
-
-			// Bright pass -> extract bright parts into pingpongTex[0]
-			glBindFramebuffer(GL_FRAMEBUFFER, pingpongFBO[0]);
-			glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-			glClear(GL_COLOR_BUFFER_BIT);
-
-			brightShader.activate();
-			brightShader.setInt("scene", 0);
-			// lower threshold so the sun gets picked up; tune between 0.3 - 1.0
-			brightShader.setFloat("threshold", 0.6f);
-
-			glActiveTexture(GL_TEXTURE0);
-			glBindTexture(GL_TEXTURE_2D, colorBuffer);
-
-			glBindVertexArray(quadVAO);
-			glDrawArrays(GL_TRIANGLES, 0, 6);
-
-			// Blur pass (ping-pong)
-			bool horizontal = true;
-			bool first = true;
-			int blurPasses = 10;
-
-			blurShader.activate();
-			blurShader.setInt("image", 0);
-
-			for (int i = 0; i < blurPasses; i++) {
-				glBindFramebuffer(GL_FRAMEBUFFER, pingpongFBO[horizontal ? 1 : 0]);
-				blurShader.setBool("horizontal", horizontal);
-
-				glActiveTexture(GL_TEXTURE0);
-				glBindTexture(
-					GL_TEXTURE_2D,
-					first ? pingpongTex[0] : pingpongTex[horizontal ? 0 : 1]
-				);
-
-				glBindVertexArray(quadVAO);
-				glDrawArrays(GL_TRIANGLES, 0, 6);
-
-				horizontal = !horizontal;
-				if (first) first = false;
-			}
-
-			// final pass: combine HDR scene + blurred bloom
-			glBindFramebuffer(GL_FRAMEBUFFER, 0);
-			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-			finalShader.activate();
-			finalShader.setInt("scene", 0);
-			finalShader.setInt("bloom", 1);
-			finalShader.setFloat("exposure", 1.0f);
-
-			glActiveTexture(GL_TEXTURE0);
-			glBindTexture(GL_TEXTURE_2D, colorBuffer);
-
-			glActiveTexture(GL_TEXTURE1);
-			glBindTexture(GL_TEXTURE_2D, pingpongTex[!horizontal]);
-
-			glBindVertexArray(quadVAO);
-			glDrawArrays(GL_TRIANGLES, 0, 6);
-
-			glEnable(GL_DEPTH_TEST);
+		bloom.render();   // bright pass -> multi-level blur -> tone map + gamma -> screen
 
 		glfwSwapBuffers(window);
 		glfwPollEvents();
@@ -392,7 +246,9 @@ int main() {
 }
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
+	if (width == 0 || height == 0) return;   // minimised
 	glViewport(0, 0, width, height);
+	if (g_bloom) g_bloom->resize(width, height);   // the HDR / bloom targets must match the window
 
 	SCR_HEIGHT = height;
 	SCR_WIDTH = width;

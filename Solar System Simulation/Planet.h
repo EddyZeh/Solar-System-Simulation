@@ -1,54 +1,58 @@
 #pragma once
 
 #ifndef PLANET_H
+#define PLANET_H
+
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/quaternion.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "Shader.h"
 #include "Mesh.h"
+#include "Physics.h"
 
 class Planet {
 public:
 	Planet(const std::string& name,
 		float radius,
-		float distanceFromPlanet,
-		float orbitSpeedDegPerSec,
-		float rotationSpeedDegPerSec,
+		double mass,
+		float orbitRadius,          
+		float spinDegPerSec,        
+		float axialTiltDeg,         
 		GLuint textureID,
-		std::shared_ptr<Planet> parent = nullptr);
+		std::shared_ptr<Planet> parent = nullptr,
+		float emission = 0.0f);     
+	
+	void update(double dt);
+	void draw(Shader& shader);
 
-	void update(float deltaTime, float timeScale = 1.0f);
-	void draw(Shader& shader, const glm::mat4& parentModel);
-
-	glm::vec3 positionWorld() const;
+	glm::vec3 positionWorld() const { return glm::vec3(position); }
 
 	void addChild(const std::shared_ptr<Planet>& c) { children.push_back(c); }
 
 	std::string name;
 	float radius;
-	float distanceFromPlanet;
-	float orbitSpeed;
-	float rotationSpeed;
-	float orbitAngleDeg;
-	float rotationAngleDeg;
-	glm::vec3 orbitAxis;
-	glm::vec3 rotationAxis;
+	double mass;
+	float emission;
+
+	// --- physical state (double precision) ---
+	glm::dvec3 position;          
+	glm::dvec3 relPosition;       
+	glm::dvec3 relVelocity;       
+	glm::dquat orientation;       
+	glm::dvec3 angularMomentum;   
+	double momentOfInertia;
 
 	GLuint textureID;
 	static Mesh* sharedSphere;
 	std::shared_ptr<Planet> parent;
 	std::vector<std::shared_ptr<Planet>> children;
-
-
-private:
-	glm::mat4 computeLocalModel() const;
-	glm::mat4 computeWorldModel() const;
 };
 
 
 #endif // !PLANET_H
-
